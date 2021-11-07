@@ -166,7 +166,7 @@ def stats_between_dates(startdate, enddate):
 
     if startdate_there == True and enddate_there == True:
         results = session.query(func.max(Measurement.tobs), func.min(Measurement.tobs),func.avg(Measurement.tobs)).\
-            filter(Measurement.date >= startdate).all()
+            filter(Measurement.date >= startdate).filter(Measurement.date <= enddate).all()
     else:
         date_error = f"One or both of these dates is not in the dataset. Please choose dates between {min_date} and {max_date}"
         return jsonify({f"error": date_error}), 404
