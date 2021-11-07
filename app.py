@@ -36,7 +36,7 @@ def welcome():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/2017-08-23<br/>"
+        f"/api/v1.0/2016-08-23<br/>"
         f"/api/v1.0/2016-08-23/2017-08-23<br/>"
     )
 
@@ -109,7 +109,89 @@ def tobs():
 
     return jsonify(temperatures)
 
+@app.route("/api/v1.0/<startdate>")
+def stats_per_startdate(startdate):
+
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return min temperature, avg, temperature and max temperature for given start date"""
+    # Query min temperature, avg, temperature and max temperature for given start date
+    # Get min and max date to help the user choose
+    min_date = session.query(func.min(Measurement.date)).all()
+    min_date = min_date[0][0]
+    max_date = session.query(func.max(Measurement.date)).all()
+    max_date = max_date[0][0]
+
+    # check if the date passed is in the dataset
+    date_there = bool(session.query(Measurement).filter_by(date=startdate).first())
+
+    if date_there == True:
+        results = session.query(func.max(Measurement.tobs), func.min(Measurement.tobs),func.avg(Measurement.tobs)).\
+            filter(Measurement.date >= startdate).all()
+    else:
+        date_error = f"This date is not in the dataset. Please choose a date between {min_date} and {max_date}"
+        return jsonify({f"error": date_error}), 404
+
+    session.close()
+
+    temp_stats = []
+    for result in results:
+        temp_dict = {"TMAX":[], "TMIN":[], "TAVG":[]}
+        temp_dict["TMAX"] = result[0]
+        temp_dict["TMIN"] = result[1]
+        temp_dict["TAVG"] = result[2]
+        temp_stats.append(temp_dict)
+
+    return jsonify(temp_stats)
+
+
+@app.route("/api/v1.0/<startdate>/<enddate>")
+def stats_between_dates(startdate, enddate):
+
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return min temperature, avg, temperature and max temperature between start and end date"""
+    # Query min temperature, avg, temperature and max temperature between start and end date
+    # Get min and max date to help the user choose
+    min_date = session.query(func.min(Measurement.date)).all()
+    min_date = min_date[0][0]
+    max_date = session.query(func.max(Measurement.date)).all()
+    max_date = max_date[0][0]
+
+    # check if the date passed is in the dataset
+    startdate_there = bool(session.query(Measurement).filter_by(date=startdate).first())
+    enddate_there = bool(session.query(Measurement).filter_by(date=enddate).first())
+
+    if startdate_there == True and enddate_there == True:
+        results = session.query(func.max(Measurement.tobs), func.min(Measurement.tobs),func.avg(Measurement.tobs)).\
+            filter(Measurement.date >= startdate).all()
+    else:
+        date_error = f"One or both of these dates is not in the dataset. Please choose dates between {min_date} and {max_date}"
+        return jsonify({f"error": date_error}), 404
+
+    session.close()
+
+    temp_stats_period = []
+    for result in results:
+        temp_dict = {"TMAX":[], "TMIN":[], "TAVG":[]}
+        temp_dict["TMAX"] = result[0]
+        temp_dict["TMIN"] = result[1]
+        temp_dict["TAVG"] = result[2]
+        temp_stats_period.append(temp_dict)
+
+    return jsonify(temp_stats_period)
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
