@@ -1,4 +1,7 @@
 import numpy as np
+import pandas as pd
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
@@ -17,8 +20,8 @@ Base = automap_base()
 Base.prepare(engine, reflect=True)
 
 # Save reference to the table
-Measurements = Base.classes.measurement
-Stations = Base.classes.station
+Measurement = Base.classes.measurement
+Station = Base.classes.station
 
 # Set up Flask
 app = Flask(__name__)
@@ -44,7 +47,7 @@ def precipitation():
 
     """Return precipitation data"""
     # Query all stations
-    results = session.query(Measurements.date, Measurements.prcp).all()
+    results = session.query(Measurement.date, Measurement.prcp).all()
 
     session.close()
 
@@ -64,7 +67,7 @@ def stations():
 
     """Return a list of all stations"""
     # Query all stations
-    results = session.query(Stations.name).all()
+    results = session.query(Station.name).all()
 
     session.close()
 
@@ -73,6 +76,38 @@ def stations():
 
     return jsonify(all_stations)
 
+@app.route("/api/v1.0/tobs")
+def tobs():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return a list of temperature data for the most active station last year"""
+    # Query all temperature data for most active station last year
+    statement = session.query(Measurement.station, func.count(Measurement.id)).\
+                        group_by(Measurement.station).order_by(func.count(Measurement.id).desc()).limit(1).statement
+    station_df = pd.read_sql_query(statement, session.bind)
+    most_active_station_id = station_df['station'][0]
+
+    result = session.query(func.max(Measurement.date)).all()
+    # to_date = result[0][0]
+    to_date = datetime.strptime(result[0][0], '%Y-%m-%d')
+    from_date = to_date - relativedelta(months=+12)
+
+
+    results = session.query(Measurement.date, Measurement.tobs).filter(Measurement.date > from_date).\
+                filter(Measurement.date < to_date).filter(Measurement.station == most_active_station_id)
+    
+
+    session.close()
+
+    temperatures = []
+    for date, tobs in results:
+        temperature = {}
+        temperature["date"] = date
+        temperature["tobs"] = tobs
+        temperatures.append(temperature)
+
+    return jsonify(temperatures)
 
 
 
